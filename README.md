@@ -1,101 +1,134 @@
 # Resume Screening & Candidate Ranking System
 
-A full-stack web application that screens resumes against a job description, ranks candidates by match score, and shows matched and missing skills in a simple recruiter dashboard.
+Final-year full-stack project for automated resume screening and candidate ranking.
+
+A full-stack web application that helps recruiters upload a job description and multiple resumes, automatically rank candidates based on skill matching, view uploaded resume files, and export ranked results as CSV. The application is built with a React + Vite frontend and a Node.js + Express backend with MySQL-compatible database integration, and it is deployed with environment-based configuration for production use.
+
+## Live Demo
+
+- Frontend: https://resume-screening-frontend-omega.vercel.app/
+- Backend: https://resume-screening-backend-basz.onrender.com
+- GitHub Repository: https://github.com/navinash-db/resume-screening-app
 
 ## Features
 
-- Paste a job description or upload a JD file
-- Upload multiple resumes
-- Parse resume and JD content
-- Rank candidates by match score
-- Show matched and missing skills
-- Search and sort candidates
-- Preview uploaded resumes
-- Export ranked candidates as CSV
+- Upload a job description as text or file
+- Upload single or multiple resumes
+- Support resume uploads in PDF, DOC, and DOCX formats
+- Extract and analyze resume content
+- Detect JD-related skills
+- Generate candidate match scores from 0 to 100
+- Rank candidates from highest to lowest fit
+- Show matched skills and missing skills
+- View uploaded resume files
+- Search and sort candidate results
+- Export ranked candidates as CSV (Excel-compatible)
+- Responsive UI for desktop and mobile
 
 ## Tech Stack
 
-**Frontend**
+### Frontend
+
 - React
 - Vite
 - Axios
+- React Hot Toast
 - CSS
 
-**Backend**
+### Backend
+
 - Node.js
 - Express.js
 - Multer
-- MySQL
+- Resume text parsing utilities
+- MySQL-compatible database
 
----
+### Deployment
+
+- Frontend: Vercel
+- Backend: Render
 
 ## Project Structure
 
 ```bash
 resume-screening-app/
+│
+├── frontend/
+│   ├── src/
+│   ├── public/
+│   ├── package.json
+│   └── .env
+│
 ├── backend/
+│   ├── uploads/
 │   ├── server.js
 │   ├── db.js
 │   ├── parser.js
-│   ├── uploads/
 │   └── package.json
-├── frontend/
-│   ├── src/
-│   │   ├── App.jsx
-│   │   ├── App.css
-│   │   └── main.jsx
-│   └── package.json
-└── README.md
 ```
 
----
+## Workflow
 
-## Setup Instructions
+1. Upload one or more resumes.
+2. Enter a Job Description manually or upload a JD file.
+3. The backend extracts resume and JD text.
+4. Candidate resumes are compared against the JD.
+5. A match score is generated for each candidate.
+6. Candidates are ranked from highest to lowest score.
+7. Results are shown in a searchable and sortable dashboard.
+8. Ranked results can be exported as CSV.
 
-### 1. Clone the project
+## Architecture Overview
+
+The application follows a simple full-stack architecture:
+
+- **Frontend:** React + Vite application hosted on Vercel
+- **Backend:** Node.js + Express API hosted on Render
+- **Database:** MySQL-compatible database used to store candidate records
+- **File Handling:** Multer is used for uploading resumes and JD files, and uploaded files are stored on the backend
+- **Processing Flow:** The frontend sends JD and resume files to the backend, the backend extracts text, performs skill-based matching and scoring, stores candidate results in the database, and returns ranked results to the frontend
+
+## Scoring Approach
+
+The scoring logic uses a keyword and skill-based comparison approach between the job description and resume text.
+
+Main scoring factors:
+
+- Skill match between JD and resume
+- Presence of relevant technical keywords
+- Project and internship indicators
+- Experience-related keywords
+- Education and general role relevance
+
+A weighted score is calculated and normalized into a 0–100 style ranking range, then candidates are sorted from highest to lowest match score.
+
+## Assumptions
+
+- Candidate name is derived from the uploaded resume filename when an exact name is not parsed
+- Placeholder email may be generated when an email is not extracted from the resume
+- Education and experience are currently simplified/defaulted in some cases
+- Scoring is heuristic and keyword-based, not LLM-based semantic ranking
+- CSV export is provided for ranked result download and can be opened in Excel
+
+## API Endpoints
+
+| Method | Endpoint      | Description             |
+| ------ | ------------- | ----------------------- |
+| GET    | `/`           | Health check            |
+| GET    | `/candidates` | Fetch ranked candidates |
+| POST   | `/upload`     | Upload JD and resumes   |
+| DELETE | `/candidates` | Clear all candidates    |
+
+## Installation
+
+### 1. Clone the repository
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/navinash-db/resume-screening-app.git
 cd resume-screening-app
 ```
 
-### 2. Backend setup
-
-```bash
-cd backend
-npm install
-```
-
-Configure your MySQL connection in `db.js`:
-
-```js
-const mysql = require("mysql2");
-
-const db = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "your_password",
-  database: "resume_screening"
-});
-
-module.exports = db;
-```
-
-Run the backend:
-
-```bash
-node server.js
-```
-
-Backend will run on:
-
-```bash
-http://localhost:5000
-```
-
-### 3. Frontend setup
-
-Open a new terminal:
+### 2. Setup frontend
 
 ```bash
 cd frontend
@@ -103,99 +136,60 @@ npm install
 npm run dev
 ```
 
-Frontend will run on:
+### 3. Setup backend
 
 ```bash
-http://localhost:5173
+cd backend
+npm install
+node server.js
 ```
 
-Make sure the backend is running before using the frontend.
+## Environment Variables
 
----
+### Frontend (`frontend/.env`)
 
-## Brief Documentation
+```env
+VITE_API_BASE_URL=https://resume-screening-backend-basz.onrender.com
+```
 
-### Architecture Overview
+### Backend (set in Render or local environment)
 
-The application is split into a React frontend and a Node/Express backend, with MySQL as the data store.
+```env
+DB_HOST=
+DB_USER=
+DB_PASSWORD=
+DB_NAME=
+DB_PORT=
+DB_SSL=
+FRONTEND_URL=https://resume-screening-frontend-omega.vercel.app
+PORT=5000
+```
 
-- **Frontend (React + Vite)**
-  - Provides the recruiter dashboard UI
-  - Screens:
-    - Job Description & Resume upload
-    - Summary metrics (total candidates, strong matches, average score)
-    - Candidate table and mobile cards
-  - Communicates with the backend using Axios
-  - Endpoints used:
-    - `GET /candidates`
-    - `POST /upload`
-    - `DELETE /candidates`
-    - `GET /uploads/:filename` (for resume preview)
+## Key Improvements
 
-- **Backend (Node.js + Express)**
-  - Handles file uploads with Multer
-  - Extracts text from job description file and resumes
-  - Identifies skills in JD and resumes
-  - Calculates a match score per candidate
-  - Stores candidate details and scores in MySQL
-  - Serves uploaded files from `/uploads`
+- Removed horizontal scrolling issue in candidate results
+- Replaced wide table-based results layout with responsive cards
+- Improved mobile alignment for name, email, rank, and score
+- Reduced noisy upload toast behavior
+- Added environment-based frontend API configuration
+- Improved backend deployment readiness with CORS and uploads handling
 
-- **Database (MySQL)**
-  - Stores parsed candidate data
-  - Example `candidates` table columns:
-    - `id`
-    - `name`
-    - `email`
-    - `education`
-    - `experience`
-    - `skills`
-    - `resume_text`
-    - `match_score`
-    - `matched_skills`
-    - `missing_skills`
-    - `resume_file`
+## Future Enhancements
 
-### Approach Used for Scoring Candidates
+- Better resume parsing for real email, education, and experience extraction
+- Improved duplicate detection using file or content hash
+- Pagination for larger candidate datasets
+- Smarter scoring logic with weighted semantic matching
+- Recruiter authentication and saved sessions
+- Native Excel (`.xlsx`) export support
 
-The scoring logic is intentionally simple and keyword-based (rule-based), suitable for a prototype:
+## Author
 
-- Extract text from:
-  - Job description (JD)
-  - Candidate resume
+**Navinash D.B.**
+B.Tech IT Graduate, Meenakshi College of Engineering, Chennai
+GitHub: https://github.com/navinash-db
+Email: db.navinash@gmail.com
 
-- Normalize text:
-  - Convert to lowercase
-  - Basic cleaning
+## License
 
-- Identify a set of **important skills/keywords**, for example:
-  - `react`, `node`, `javascript`, `java`, `python`
-  - `sql`, `mysql`, `postgresql`, `mongodb`
-  - `express`, `rest api`, `git`
-- For each skill:
-  - If the JD contains the skill **and** the resume contains the skill, add weighted points.
-  - Some skills have higher weight (e.g., core stack technologies).
-
-- Add extra points if the resume text contains:
-  - `project` / `projects`
-  - `internship`
-  - `experience`
-  - role-related words like `full stack`, `backend`, `frontend`, `developer`
-
-- Derive:
-  - `matched_skills`: skills present in both JD and resume
-  - `missing_skills`: skills present in JD but not found in the resume
-
-- Final score:
-  - Sum of all points from matched skills and extra signals
-  - Clamp within a reasonable range (e.g., 0–95)
-  - Store as `match_score` for sorting and display
-
-This approach is **deterministic** and easy to understand, but it is not an AI/ML model. It focuses only on keyword presence and simple heuristics.
-
-### Assumptions
-
-- The job description and resumes are in English.
-- Uploaded resumes are in supported formats (for example `.pdf`, `.docx`, `.txt`) that the parser can extract plain text from.
-- If some fields (like name, email, education, or experience) cannot be reliably parsed from the resume, they may be stored as empty or fallback values.
-- Duplicate candidates are currently handled only at the application level (no complex duplicate-detection logic in the database).
-- This scoring approach is meant for demonstration and learning, not as a production-ready ATS scoring engine.
+This project is for educational and project submission purposes.
