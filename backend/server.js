@@ -32,10 +32,13 @@ app.use(
       return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
+    methods: ["GET", "POST", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 const uploadPath = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadPath)) {
@@ -53,7 +56,19 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage });
+const allowedExtensions = [".pdf", ".doc", ".docx", ".txt"];
+
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowedExtensions.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only PDF, DOC, DOCX, and TXT files are allowed"));
+    }
+  },
+});
 
 const SKILL_KEYWORDS = [
   "react",
@@ -180,6 +195,16 @@ function getMatchedAndMissingSkills(jdText, resumeText) {
   };
 }
 
+function buildCandidateEmail(displayName) {
+  const slug = (displayName || "candidate")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return `${slug || "candidate"}@example.com`;
+}
+
 app.get("/", (req, res) => {
   res.send("Resume Screening Backend is running");
 });
@@ -262,8 +287,9 @@ app.post(
       let skipped = 0;
 
       for (const file of files) {
-        const candidateName = path.parse(file.originalname).name;
-        const email = `${candidateName.toLowerCase().replace(/\s+/g, "")}@example.com`;
+        const resumeBaseName = path.parse(file.originalname).name.trim();
+        const candidateName = resumeBaseName || "Unknown Candidate";
+        const email = buildCandidateEmail(candidateName);
 
         let resumeText = await extractTextFromFile(file.path);
 
@@ -323,7 +349,9 @@ app.post(
 
       res.json({
         success: true,
-        message: `Upload complete. Inserted: ${inserted}, Skipped duplicates: ${skipped}`,
+        message: "Upload completed successfully",
+        inserted,
+        skipped,
         jd_skills: extractSkillsFromText(jdText || ""),
       });
     } catch (error) {
@@ -335,6 +363,16 @@ app.post(
     }
   }
 );
+
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError || err) {
+    return res.status(400).json({
+      success: false,
+      message: err.message || "File upload error",
+    });
+  }
+  next();
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

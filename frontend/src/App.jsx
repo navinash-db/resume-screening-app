@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Toaster, toast } from "react-hot-toast";
 import "./App.css";
 
-const API_BASE_URL = "https://resume-screening-backend-basz.onrender.com";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "https://resume-screening-backend-basz.onrender.com";
 
 function App() {
   const [jdText, setJdText] = useState("");
@@ -14,6 +15,7 @@ function App() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState("desc");
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadSummary, setUploadSummary] = useState(null);
 
   const jdFileInputRef = useRef(null);
   const resumeInputRef = useRef(null);
@@ -45,16 +47,12 @@ function App() {
     if (jdFileInputRef.current) {
       jdFileInputRef.current.value = "";
     }
-    toast.success("JD file removed");
   };
 
-  const clearResumeFiles = (showToast = false) => {
+  const clearResumeFiles = () => {
     setFiles([]);
     if (resumeInputRef.current) {
       resumeInputRef.current.value = "";
-    }
-    if (showToast) {
-      toast.success("Selected resume files removed");
     }
   };
 
@@ -84,6 +82,7 @@ function App() {
 
     try {
       setIsLoading(true);
+      setUploadSummary(null);
 
       const res = await axios.post(`${API_BASE_URL}/upload`, formData, {
         headers: {
@@ -92,12 +91,31 @@ function App() {
       });
 
       toast.dismiss(loadingToast);
-      toast.success(res.data.message || "Candidates uploaded successfully");
+
+      const inserted = Number(res.data.inserted || 0);
+      const skipped = Number(res.data.skipped || 0);
+
+      if (inserted > 0) {
+        toast.success(
+          inserted === 1
+            ? "1 resume uploaded successfully"
+            : `${inserted} resumes uploaded successfully`
+        );
+      } else if (skipped > 0) {
+        toast("No new resumes were added");
+      } else {
+        toast.success("Upload completed successfully");
+      }
+
+      setUploadSummary({
+        inserted,
+        skipped,
+      });
 
       setJdSkills(res.data.jd_skills || []);
       await fetchCandidates();
 
-      clearResumeFiles(false);
+      clearResumeFiles();
       setJdFile(null);
       if (jdFileInputRef.current) {
         jdFileInputRef.current.value = "";
@@ -125,7 +143,8 @@ function App() {
       setCandidates([]);
       setJdSkills([]);
       setSearchTerm("");
-      clearResumeFiles(false);
+      setUploadSummary(null);
+      clearResumeFiles();
       setJdFile(null);
 
       if (jdFileInputRef.current) {
@@ -154,6 +173,18 @@ function App() {
     if (score >= 70) return "score-pill good";
     if (score >= 50) return "score-pill average";
     return "score-pill low";
+  };
+
+  const getVisibleSkills = (skillsText) => {
+    if (!skillsText) {
+      return [];
+    }
+
+    return skillsText
+      .split(",")
+      .map((skill) => skill.trim())
+      .filter(Boolean)
+      .slice(0, 5);
   };
 
   const filteredAndSortedCandidates = useMemo(() => {
@@ -416,6 +447,17 @@ function App() {
               </div>
             </div>
 
+            {uploadSummary && (
+              <div className="upload-inline-note">
+                <span>
+                  Added: <strong>{uploadSummary.inserted}</strong>
+                </span>
+                <span>
+                  Duplicates skipped: <strong>{uploadSummary.skipped}</strong>
+                </span>
+              </div>
+            )}
+
             {files.length > 0 && (
               <div className="selected-files">
                 {Array.from(files).map((file, index) => (
@@ -522,7 +564,7 @@ function App() {
           </div>
         </section>
 
-        <section className="card table-section">
+        <section className="card results-section">
           <div className="section-head results-head">
             <div>
               <h2>Candidate Rankings</h2>
@@ -545,35 +587,39 @@ function App() {
               </p>
             </div>
           ) : (
-            <>
-              <div className="mobile-card-list">
-                {filteredAndSortedCandidates.map((candidate, index) => (
-                  <article className="candidate-mobile-card" key={candidate.id}>
-                    <div className="candidate-mobile-top">
-                      <div>
-                        <span className="mobile-rank">Rank #{index + 1}</span>
-                        <h3 className="mobile-name">{candidate.name}</h3>
-                        <p className="mobile-email">{candidate.email}</p>
+            <div className="results-grid">
+              {filteredAndSortedCandidates.map((candidate, index) => {
+                const visibleSkills = getVisibleSkills(candidate.skills);
+
+                return (
+                  <article className="candidate-card" key={candidate.id}>
+                    <div className="candidate-card-header">
+                      <span className="candidate-rank-badge">Rank #{index + 1}</span>
+
+                      <div className="candidate-title-block">
+                        <h3 className="candidate-name">{candidate.name || "-"}</h3>
+                        <p className="candidate-email">{candidate.email || "-"}</p>
                       </div>
+
                       <span className={getScoreClass(candidate.match_score)}>
-                        {candidate.match_score}%
+                        {candidate.match_score || 0}%
                       </span>
                     </div>
 
-                    <div className="mobile-meta-grid">
-                      <div>
+                    <div className="candidate-meta-grid">
+                      <div className="candidate-meta-item">
                         <span className="meta-label">Education</span>
-                        <p>{candidate.education}</p>
+                        <p>{candidate.education || "-"}</p>
                       </div>
-                      <div>
+                      <div className="candidate-meta-item">
                         <span className="meta-label">Experience</span>
-                        <p>{candidate.experience} yrs</p>
+                        <p>{candidate.experience || 0} yrs</p>
                       </div>
-                      <div>
+                      <div className="candidate-meta-item">
                         <span className="meta-label">Status</span>
-                        <p>{getMatchLabel(candidate.match_score)}</p>
+                        <p>{getMatchLabel(candidate.match_score || 0)}</p>
                       </div>
-                      <div>
+                      <div className="candidate-meta-item">
                         <span className="meta-label">Resume</span>
                         <p>
                           {candidate.resume_file ? (
@@ -591,12 +637,22 @@ function App() {
                       </div>
                     </div>
 
-                    <div className="mobile-section">
-                      <span className="meta-label">Skills</span>
-                      <p className="mobile-skills-text">{candidate.skills || "-"}</p>
+                    <div className="candidate-section">
+                      <span className="meta-label">Top Skills</span>
+                      {visibleSkills.length > 0 ? (
+                        <div className="chip-wrap">
+                          {visibleSkills.map((skill, i) => (
+                            <span key={i} className="chip chip-neutral">
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p>-</p>
+                      )}
                     </div>
 
-                    <div className="mobile-section">
+                    <div className="candidate-section">
                       <span className="meta-label">Matched Skills</span>
                       {candidate.matched_skills?.length ? (
                         <div className="chip-wrap">
@@ -611,7 +667,7 @@ function App() {
                       )}
                     </div>
 
-                    <div className="mobile-section">
+                    <div className="candidate-section">
                       <span className="meta-label">Missing Skills</span>
                       {candidate.missing_skills?.length ? (
                         <div className="chip-wrap">
@@ -626,86 +682,9 @@ function App() {
                       )}
                     </div>
                   </article>
-                ))}
-              </div>
-
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Rank</th>
-                      <th>Name</th>
-                      <th>Email</th>
-                      <th>Education</th>
-                      <th>Experience</th>
-                      <th>Resume Preview</th>
-                      <th>Skills</th>
-                      <th>Matched Skills</th>
-                      <th>Missing Skills</th>
-                      <th>Match Score</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredAndSortedCandidates.map((candidate, index) => (
-                      <tr key={candidate.id}>
-                        <td>{index + 1}</td>
-                        <td className="table-name-cell">{candidate.name}</td>
-                        <td>{candidate.email}</td>
-                        <td>{candidate.education}</td>
-                        <td>{candidate.experience} yrs</td>
-                        <td>
-                          {candidate.resume_file ? (
-                            <a
-                              href={`${API_BASE_URL}/uploads/${candidate.resume_file}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              View Resume
-                            </a>
-                          ) : (
-                            "-"
-                          )}
-                        </td>
-                        <td className="skills-text-cell">{candidate.skills}</td>
-                        <td>
-                          {candidate.matched_skills?.length ? (
-                            <div className="chip-wrap">
-                              {candidate.matched_skills.map((skill, i) => (
-                                <span key={i} className="chip chip-primary">
-                                  {skill}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            "-"
-                          )}
-                        </td>
-                        <td>
-                          {candidate.missing_skills?.length ? (
-                            <div className="chip-wrap">
-                              {candidate.missing_skills.map((skill, i) => (
-                                <span key={i} className="chip chip-danger">
-                                  {skill}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            "-"
-                          )}
-                        </td>
-                        <td>
-                          <span className={getScoreClass(candidate.match_score)}>
-                            {candidate.match_score}%
-                          </span>
-                        </td>
-                        <td>{getMatchLabel(candidate.match_score)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
+                );
+              })}
+            </div>
           )}
         </section>
       </main>
